@@ -1,16 +1,16 @@
 from dash import Dash, dcc, html, Input, Output, no_update, State, MATCH, ALL
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
+import plotly.express as px
 import pandas as pd
 
 
 
-# Paths to your datasets organized by page
 dataset_paths = {
     'p1': {
         'pca': 'data/pca_data_3D.csv',
         'umap': 'data/umap_data_3D.csv',
-        'umap_pca': 'data/data_umap.csv',
+        'umap_pca': 'data/umap_dataPCA_3D.csv',
         'tsne': 'data/tsne_data_3D.csv',
         'lda': 'data/lda_data_3D.csv',
     },
@@ -28,20 +28,37 @@ dataset_paths = {
         'tsne': 'data/tsne_data_3D_mps.csv',
         'lda': 'data/lda_data_3D_mps.csv',
     },
+
+    'p4': {
+        'pca': 'data/pca_data_3D_spectro.csv',
+        'umap': 'data/umap_data_3D_spectro.csv',
+        'umap_pca': '',
+        'tsne': 'data/tsne_data_3D_spectro.csv',
+        'lda': 'data/lda_data_3D_spectro.csv',
+    },
+
+    'p5': {
+        'pca': 'data/pca_data_3D_vae.csv',
+        'umap': 'data/umap_data_3D_vae.csv',
+        'umap_pca': '',
+        'tsne': 'data/tsne_data_3D_vae.csv',
+        'lda': 'data/lda_data_3D_vae.csv',
+    },
 }
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 def layout_page(page_id):
-    # This function now accepts a page_id to differentiate between pages
     title_map = {
         'p1': "Computed Features",
-        'p2': "Pitch Contour",
-        'p3': "MPS",
+        'p2': "Pitch Contour Features",
+        'p3': "MPS Features",
+        'p4': "Spectro Features",
+        'p5': 'Latent features'
     }
     return html.Div([
         dbc.Row(html.H4(title_map[page_id], className="mb-4 mt-4")),
-        generate_page_content(page_id)  # Pass the page_id to the content generator
+        generate_page_content(page_id)  
     ])
 
 def create_homepage():
@@ -68,6 +85,7 @@ def create_homepage():
                     - Computed Features: Explore basic acoustic features.
                     - Pitch Contour: Analyze the pitch dynamics over time.
                     - MPS: Delve into the modulation power spectrum.
+                    - VAE: Explore the latent features from a tunned variational autoencoder
 
                     **Get Started:** Use the navigation bar to select a feature and begin your exploration.
                     """, className="text-justify"), md=4),
@@ -77,40 +95,67 @@ def create_homepage():
 
 
 def generate_page_content(page_id):
-    # Use page_id to dynamically update the dataset selector based on the page
-    return dbc.Row([
-        dbc.Col([
-            html.H5("Select Dataset:"),
-            dbc.Select(
-                id={
-                    'type': 'dataset-selector', 
-                    'index': page_id  # Use dictionary id to differentiate between pages
-                },
-                options=[
-                    {'label': 'PCA', 'value': 'pca'},
-                    {'label': 'UMAP', 'value': 'umap'},
-                    {'label': 'UMAP with PCA features', 'value': 'umap_pca'},
-                    {'label': 'T-SNE', 'value': 'tsne'},
-                    {'label': 'LDA', 'value': 'lda'}
-                ],
-                value='pca',  # Default value
-            ),
-        ], width=3),
-        dbc.Col([
-            dcc.Graph(
-                id={
-                    'type': 'graph-basic', 
-                    'index': page_id  # Use dictionary id for the graph as well
-                }, 
-                clear_on_unhover=True, 
-                style={'height': '800px'}
-            ),
-            dcc.Tooltip(id={
-                'type': 'graph-tooltip', 
-                'index': page_id  # And for the tooltip
-            }),
-        ], width=9),
-    ])
+    # Column for selecting the dataset
+    dataset_selector_col = dbc.Col([
+        html.H5("Select Dataset:"),
+        dbc.Select(
+            id={
+                'type': 'dataset-selector',
+                'index': page_id
+            },
+            options=[
+                {'label': 'PCA', 'value': 'pca'},
+                {'label': 'UMAP', 'value': 'umap'},
+                {'label': 'UMAP with PCA features', 'value': 'umap_pca'},
+                {'label': 'T-SNE', 'value': 'tsne'},
+                {'label': 'LDA', 'value': 'lda'}
+            ],
+            value='pca',
+        ),
+        html.Br(),
+        html.H5("Filter By:"),
+        dbc.Select(
+            id={'type': 'filter-bird', 'index': page_id},
+            options=[],  # Options will be dynamically generated
+            value='all',  # Set 'All' as default value
+            placeholder="Select a Bird",
+        ),
+        html.Br(),
+        dbc.Select(
+            id={'type': 'filter-morph', 'index': page_id},
+            options=[],  # Options will be dynamically generated
+            value='all',  # Set 'All' as default value
+            placeholder="Select a Morph",
+        ),
+        html.Br(),
+        dbc.Select(
+            id={'type': 'filter-population', 'index': page_id},
+            options=[],  # Options will be dynamically generated
+            value='all',  # Set 'All' as default value
+            placeholder="Select a Population",
+        ),
+    ], width=3)
+
+    # Column for the graph
+    graph_col = dbc.Col([
+        dcc.Graph(
+            id={
+                'type': 'graph-basic',
+                'index': page_id
+            },
+            clear_on_unhover=True,
+            style={'height': '800px'}
+        ),
+        dcc.Tooltip(id={
+            'type': 'graph-tooltip',
+            'index': page_id
+        }),
+    ], width=9)
+
+    # Combine columns into a single row, with filtering options now vertically aligned
+    return dbc.Row([dataset_selector_col, graph_col])
+
+
 
 app.layout = dbc.Container([
     dcc.Location(id='url', refresh=False),
@@ -120,8 +165,11 @@ app.layout = dbc.Container([
             dbc.DropdownMenu(
                 children=[
                     dbc.DropdownMenuItem("Computed Features", href="/computed-features"),
-                    dbc.DropdownMenuItem("Pitch Contour", href="/pitch-contour"),
-                    dbc.DropdownMenuItem("MPS", href="/mps"),
+                    dbc.DropdownMenuItem("Pitch Contour Features", href="/pitch-contour"),
+                    dbc.DropdownMenuItem("MPS Features", href="/mps"),
+                    dbc.DropdownMenuItem("Spectro Features", href="/spec"),
+                    dbc.DropdownMenuItem("VAE Latent Features", href="/vae"),
+
                 ],
                 nav=True,
                 in_navbar=True,
@@ -145,80 +193,175 @@ def display_page(pathname):
         return layout_page('p2')
     elif pathname == '/mps':
         return layout_page('p3')
+    elif pathname == '/spec':
+        return layout_page('p4')
+    elif pathname == '/vae':
+        return layout_page('p5')
     else:
         return create_homepage()  # Return the homepage layout for the root URL
+    
 
-# Callback to update graph based on dataset selection
 @app.callback(
-    Output({'type': 'graph-basic', 'index': MATCH}, "figure"),
-    [Input({'type': 'dataset-selector', 'index': MATCH}, "value"),
-     Input('url', 'pathname')]
+    [Output({'type': 'filter-bird', 'index': MATCH}, 'options'),
+     Output({'type': 'filter-morph', 'index': MATCH}, 'options'),
+     Output({'type': 'filter-population', 'index': MATCH}, 'options')],
+    [Input({'type': 'dataset-selector', 'index': MATCH}, 'value')],
+    [State('url', 'pathname')]
 )
-def update_graph(selected_dataset, pathname):
-    page_id = 'p1'  # Default to p1, adjust based on pathname
+def update_filter_options(selected_dataset, pathname):
+    page_id = 'p1' 
     if pathname == '/computed-features':
         page_id = 'p1'
     elif pathname == '/pitch-contour':
         page_id = 'p2'
     elif pathname == '/mps':
         page_id = 'p3'
+    elif pathname == '/spec':
+        page_id = 'p4'
+    elif pathname == '/vae':
+        page_id = 'p5'
 
-    # Use the correct dataset path based on the page
+    dataset_path = dataset_paths[page_id][selected_dataset]
+    df = pd.read_csv(dataset_path)
+    bird_options = [{'label': 'All', 'value': 'all'}] + [{'label': bird, 'value': bird} for bird in df['bird'].unique()]
+    morph_options = [{'label': 'All', 'value': 'all'}] + [{'label': morph, 'value': morph} for morph in df['morph'].unique()]
+    pop_options = [{'label': 'All', 'value': 'all'}] + [{'label': pop, 'value': pop} for pop in df['pop_code'].unique()]
+    
+    return bird_options, morph_options, pop_options
+
+@app.callback(
+    Output({'type': 'graph-basic', 'index': MATCH}, "figure"),
+    [Input({'type': 'dataset-selector', 'index': MATCH}, "value"),
+     Input({'type': 'filter-bird', 'index': MATCH}, "value"),
+     Input({'type': 'filter-morph', 'index': MATCH}, "value"),
+     Input({'type': 'filter-population', 'index': MATCH}, "value"),
+     Input('url', 'pathname')]
+)
+def update_graph(selected_dataset, selected_bird, selected_morph, selected_population, pathname):
+    page_id = 'p1' 
+    if pathname == '/computed-features':
+        page_id = 'p1'
+    elif pathname == '/pitch-contour':
+        page_id = 'p2'
+    elif pathname == '/mps':
+        page_id = 'p3'
+    elif pathname == '/spec':
+        page_id = 'p4'
+    elif pathname == '/vae':
+        page_id = 'p5'
+
     dataset_path = dataset_paths[page_id][selected_dataset]
     df = pd.read_csv(dataset_path)
 
-    # Create figure based on the selected dataset
-    fig = go.Figure(data=[
-        go.Scatter3d(
-            x=df['Dim1'], 
-            y=df['Dim2'], 
-            z=df['Dim3'],
+    df['is_selected'] = True  # Assume all points are selected initially
+
+    # Update 'is_selected' based on filters
+    if selected_bird != 'all':
+        df['is_selected'] &= (df['bird'] == selected_bird)
+    if selected_morph != 'all':
+        df['is_selected'] &= (df['morph'] == selected_morph)
+    if selected_population != 'all':
+        df['is_selected'] &= (df['pop_code'] == selected_population)
+    
+    df.reset_index(drop=True, inplace=True)
+
+    marker_selected = dict(size=5, opacity=1, line=dict(color='black', width=2), color=df[df['is_selected']]['color'])
+    marker_unselected = dict(size=3, color='lightgrey', opacity=0.35)
+
+    # Plotting
+    fig = go.Figure()
+
+    # Add unselected points
+    fig.add_trace(go.Scatter3d(
+        x=df[~df['is_selected']]['Dim1'],
+        y=df[~df['is_selected']]['Dim2'],
+        z=df[~df['is_selected']]['Dim3'],
+        mode='markers',
+        marker=marker_unselected,
+        hoverinfo='none'  
+    ))
+
+    if df['is_selected'].any():
+        fig.add_trace(go.Scatter3d(
+            x=df[df['is_selected']]['Dim1'],
+            y=df[df['is_selected']]['Dim2'],
+            z=df[df['is_selected']]['Dim3'],
             mode='markers',
-            marker=dict(
-                color=df['color'],          
-                opacity=1,                
-                line=dict(
-                    color='black',          
-                    width=2                 
-                )
-            )
-        )
-    ])
+            marker=marker_selected
+        ))
+        
+    
 
     fig.update_traces(hoverinfo="none", hovertemplate=None)
-    fig.update_layout(margin={'l': 0, 'r': 0, 'b': 0, 't': 0})
+    fig.update_layout(
+    margin={'l': 0, 'r': 0, 'b': 0, 't': 0},
+    hovermode='closest',
+    scene=dict(
+        xaxis=dict(showspikes=False),
+        yaxis=dict(showspikes=False),
+        zaxis=dict(showspikes=False)
+    )
+)
     return fig
 
+
+
 @app.callback(
-    Output({'type': 'graph-tooltip', 'index': MATCH}, "show"),
-    Output({'type': 'graph-tooltip', 'index': MATCH}, "bbox"),
-    Output({'type': 'graph-tooltip', 'index': MATCH}, "children"),
-    [Input({'type': 'graph-basic', 'index': MATCH}, "hoverData"),
-     State({'type': 'dataset-selector', 'index': MATCH}, "value"),
-     State('url', 'pathname')]  
+    [Output({'type': 'graph-tooltip', 'index': MATCH}, "show"),
+     Output({'type': 'graph-tooltip', 'index': MATCH}, "bbox"),
+     Output({'type': 'graph-tooltip', 'index': MATCH}, "children")],
+    [Input({'type': 'graph-basic', 'index': MATCH}, "hoverData")],
+    [State({'type': 'dataset-selector', 'index': MATCH}, "value"),
+     State({'type': 'filter-bird', 'index': MATCH}, "value"),
+     State({'type': 'filter-morph', 'index': MATCH}, "value"),
+     State({'type': 'filter-population', 'index': MATCH}, "value"),
+     State('url', 'pathname')]
 )
-def display_hover(hoverData, selected_dataset, pathname):
+def display_hover(hoverData, selected_dataset, selected_bird, selected_morph, selected_population, pathname):
     if hoverData is None:
         return False, no_update, no_update
 
     # Extract the page_id from the pathname
-    page_id = 'p1'  # Default, adjust based on your actual URL structure
+    page_id = 'p1'  
     if pathname.endswith('computed-features'):
         page_id = 'p1'
     elif pathname.endswith('pitch-contour'):
         page_id = 'p2'
     elif pathname.endswith('mps'):
         page_id = 'p3'
+    elif pathname.endswith('spec'):
+        page_id = 'p4'
+    elif pathname.endswith('vae'):
+        page_id = 'p5'
 
-    # Use the correct dataset path based on the page
     dataset_path = dataset_paths[page_id][selected_dataset]
     df = pd.read_csv(dataset_path)
+    df['is_selected'] = True
 
+    if selected_bird != 'all':
+        df['is_selected'] &= (df['bird'] == selected_bird)
+    if selected_morph != 'all':
+        df['is_selected'] &= (df['morph'] == selected_morph)
+    if selected_population != 'all':
+        df['is_selected'] &= (df['pop_code'] == selected_population)
+    
+  
+    selected_count = df[df['is_selected']].shape[0]
     pt = hoverData["points"][0]
     bbox = pt["bbox"]
-    num = pt["pointNumber"]
+    point_index = pt["pointNumber"]
 
-    df_row = df.iloc[num]
+    if point_index >= selected_count:
+        return False, no_update, no_update
+
+    df_row = df[df['is_selected']].iloc[point_index]
+
+    # Check if the hovered point is selected
+    if not df_row['is_selected']:
+        # If the point is not selected, do not show the tooltip
+        return False, no_update, no_update
+
+    # If the point is selected, proceed to show the tooltip as before
     img_src = df_row['image_url']
 
     children = html.Div([
@@ -230,6 +373,9 @@ def display_hover(hoverData, selected_dataset, pathname):
     ], style={'width': '200px', 'white-space': 'normal'})
 
     return True, bbox, children
+
+
+
 
 if __name__ == "__main__":
     app.run_server(debug=True)
