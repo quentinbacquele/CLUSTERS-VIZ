@@ -38,7 +38,6 @@ pip install -e .
 
 Run the `clusters_viz.py` script in the command prompt:
 ```bash
-cd CLUSTERS-VIZ
 python clusters_viz.py
 ``` 
 
