@@ -18,7 +18,7 @@ dataset_paths = {
     },
     'p2': {
         'pca': 'data/pca_data_3D_ts.csv',
-        'umap': '/data/umap_data_3D_ts.csv',
+        'umap': 'data/umap_data_3D_ts.csv',
         'umap_pca': '',
         'tsne': 'data/tsne_data_3D_ts.csv',
         'lda': 'data/lda_data_3D_ts.csv',
