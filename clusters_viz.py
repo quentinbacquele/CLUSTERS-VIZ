@@ -3,6 +3,8 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
+import re
+import numpy as np
 
 
 
@@ -82,9 +84,10 @@ def create_homepage():
 
                     ---
                     **Features:**
-                    - Computed Features: Explore basic acoustic features.
+                    - Traditional Features: Explore basic acoustic features.
                     - Pitch Contour: Analyze the pitch dynamics over time.
                     - MPS: Delve into the modulation power spectrum.
+                    - Spectro: Use the array of the spectrogram as features. 
                     - VAE: Explore the latent features from a tunned variational autoencoder
 
                     **Get Started:** Use the navigation bar to select a feature and begin your exploration.
@@ -113,27 +116,35 @@ def generate_page_content(page_id):
             value='pca',
         ),
         html.Br(),
-        html.H5("Filter By:"),
-        dbc.Select(
-            id={'type': 'filter-bird', 'index': page_id},
-            options=[],  # Options will be dynamically generated
-            value='all',  # Set 'All' as default value
-            placeholder="Select a Bird",
-        ),
+        html.Div([
+            html.H6("Filter by: Bird"),
+            dbc.Select(
+                id={'type': 'filter-bird', 'index': page_id},
+                options=[],  # Options will be dynamically generated
+                value='all',  # Set 'All' as default value
+                placeholder="Select a Bird",
+            ),
+        ]),
         html.Br(),
-        dbc.Select(
-            id={'type': 'filter-morph', 'index': page_id},
-            options=[],  # Options will be dynamically generated
-            value='all',  # Set 'All' as default value
-            placeholder="Select a Morph",
-        ),
+        html.Div([
+            html.H6("Filter by: Population"),
+            dbc.Select(
+                id={'type': 'filter-population', 'index': page_id},
+                options=[],  # Options will be dynamically generated
+                value='all',  # Set 'All' as default value
+                placeholder="Select a Population",
+            ),
+        ]),
         html.Br(),
-        dbc.Select(
-            id={'type': 'filter-population', 'index': page_id},
-            options=[],  # Options will be dynamically generated
-            value='all',  # Set 'All' as default value
-            placeholder="Select a Population",
-        ),
+        html.Div([
+            html.H6("Filter by: Morph"),
+            dbc.Select(
+                id={'type': 'filter-morph', 'index': page_id},
+                options=[],  # Options will be dynamically generated
+                value='all',  # Set 'All' as default value
+                placeholder="Select a Morph",
+            ),
+        ]),
     ], width=3)
 
     # Column for the graph
@@ -229,6 +240,29 @@ def update_filter_options(selected_dataset, pathname):
     
     return bird_options, morph_options, pop_options
 
+
+def generate_syllable_colormap(df, column_name):
+    # Assuming all syllables are now integers in the column
+    unique_syllables = sorted(df[column_name].dropna().unique())
+    
+    # Generate a continuous Viridis color scale
+    num_syllables = len(unique_syllables)
+    viridis_scale = px.colors.sequential.Viridis
+    colors = [viridis_scale[int(i * (len(viridis_scale)-1) / (num_syllables-1))] for i in range(num_syllables)]
+    
+    # Map each syllable to a color
+    syllable_colors = {syllable: colors[i] for i, syllable in enumerate(unique_syllables)}
+    
+    return syllable_colors
+
+
+
+def generate_pop_morph_colormap(df, syllable_column='syllable'):
+    unique_syllables = df[syllable_column].dropna().unique()
+    color_scale = px.colors.qualitative.Vivid  
+    syllable_colors = {syllable: color_scale[i % len(color_scale)] for i, syllable in enumerate(unique_syllables)}
+    return syllable_colors
+
 @app.callback(
     Output({'type': 'graph-basic', 'index': MATCH}, "figure"),
     [Input({'type': 'dataset-selector', 'index': MATCH}, "value"),
@@ -250,58 +284,81 @@ def update_graph(selected_dataset, selected_bird, selected_morph, selected_popul
     elif pathname == '/vae':
         page_id = 'p5'
 
-    dataset_path = dataset_paths[page_id][selected_dataset]
+    dataset_path = dataset_paths.get(page_id, {}).get(selected_dataset, '')
+    if not dataset_path:
+        return go.Figure()  # Return an empty figure if the dataset path isn't found
     df = pd.read_csv(dataset_path)
 
-    df['is_selected'] = True  # Assume all points are selected initially
+    df['syllable'] = df['syllable'].apply(lambda x: int(x.replace('S', '')) if isinstance(x, str) else x)
+    
 
-    # Update 'is_selected' based on filters
+    # Initialize selection column
+    df['is_selected'] = True
+
+    # Apply selection filters
     if selected_bird != 'all':
         df['is_selected'] &= (df['bird'] == selected_bird)
     if selected_morph != 'all':
         df['is_selected'] &= (df['morph'] == selected_morph)
     if selected_population != 'all':
         df['is_selected'] &= (df['pop_code'] == selected_population)
-    
-    df.reset_index(drop=True, inplace=True)
 
-    marker_selected = dict(size=5, opacity=1, line=dict(color='black', width=2), color=df[df['is_selected']]['color'])
-    marker_unselected = dict(size=3, color='lightgrey', opacity=0.35)
+    # Determine the coloring logic based on the selection
+    if selected_bird != 'all':
+        color_by = 'syllable'
+        color_map = generate_syllable_colormap(df[df['is_selected']], 'syllable')
+    elif selected_morph != 'all':
+        color_by = 'pop_code'
+        color_map = generate_pop_morph_colormap(df[df['is_selected']], 'pop_code')
+    elif selected_population != 'all':
+        color_by = 'bird'
+        color_map = generate_pop_morph_colormap(df[df['is_selected']], 'bird')
+    else:
+        color_by = 'morph'
+        color_map = generate_pop_morph_colormap(df, 'morph')
 
-    # Plotting
+    # Apply the color mapping to selected data points
+    df['color'] = pd.Series(dtype='object')
+    df.loc[df['is_selected'], 'color'] = df[df['is_selected']][color_by].map(color_map).fillna('lightgrey')
+    df.loc[~df['is_selected'], 'color'] = 'lightgrey'
+
+    # Plotting setup
     fig = go.Figure()
 
-    # Add unselected points
-    fig.add_trace(go.Scatter3d(
-        x=df[~df['is_selected']]['Dim1'],
-        y=df[~df['is_selected']]['Dim2'],
-        z=df[~df['is_selected']]['Dim3'],
-        mode='markers',
-        marker=marker_unselected,
-        hoverinfo='none'  
-    ))
-
-    if df['is_selected'].any():
+    # Add selected points
+    for label, group in df[df['is_selected']].groupby(color_by):
         fig.add_trace(go.Scatter3d(
-            x=df[df['is_selected']]['Dim1'],
-            y=df[df['is_selected']]['Dim2'],
-            z=df[df['is_selected']]['Dim3'],
+            x=group['Dim1'],
+            y=group['Dim2'],
+            z=group['Dim3'],
             mode='markers',
-            marker=marker_selected
+            marker=dict(size=5, opacity=1, line=dict(color='black', width=2), color=group['color']),
+            name=str(label)  # Set the legend name to the label of the group
         ))
-        
-    
+
+    # Add unselected points
+    if df[~df['is_selected']].any().any():
+        fig.add_trace(go.Scatter3d(
+            x=df[~df['is_selected']]['Dim1'],
+            y=df[~df['is_selected']]['Dim2'],
+            z=df[~df['is_selected']]['Dim3'],
+            mode='markers',
+            hoverinfo='none',
+            marker=dict(size=3, color='lightgrey', opacity=0.25),
+            name="Unselected"
+        ))
 
     fig.update_traces(hoverinfo="none", hovertemplate=None)
     fig.update_layout(
-    margin={'l': 0, 'r': 0, 'b': 0, 't': 0},
-    hovermode='closest',
-    scene=dict(
-        xaxis=dict(showspikes=False),
-        yaxis=dict(showspikes=False),
-        zaxis=dict(showspikes=False)
+        margin={'l': 0, 'r': 0, 'b': 0, 't': 0},
+        hovermode='closest',
+        scene=dict(
+            xaxis=dict(showspikes=False),
+            yaxis=dict(showspikes=False),
+            zaxis=dict(showspikes=False)
+        ),
+        legend_title_text=color_by.capitalize()  # Update legend title based on what we are coloring by
     )
-)
     return fig
 
 
