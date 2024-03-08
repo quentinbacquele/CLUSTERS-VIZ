@@ -245,9 +245,8 @@ def generate_syllable_colormap(df, column_name):
     # Assuming all syllables are now integers in the column
     unique_syllables = sorted(df[column_name].dropna().unique())
     
-    # Generate a continuous Viridis color scale
     num_syllables = len(unique_syllables)
-    viridis_scale = px.colors.sequential.Viridis
+    viridis_scale = px.colors.sequential.Plasma
     colors = [viridis_scale[int(i * (len(viridis_scale)-1) / (num_syllables-1))] for i in range(num_syllables)]
     
     # Map each syllable to a color

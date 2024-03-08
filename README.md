@@ -15,7 +15,8 @@ This project presents a web-based visualization dashboard for exploring clusteri
 
 To install this Cluster Viz, ensure you have Python 3.6 or later installed on your system. Follow these steps:
 
-1. Clone the repository:
+
+1. Open the terminal and clone the repository:
 
 ```bash
 git clone https://github.com/quentinbacquele/CLUSTERS-VIZ
