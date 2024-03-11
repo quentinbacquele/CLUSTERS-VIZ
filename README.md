@@ -19,7 +19,7 @@ To install this Cluster Viz, ensure you have Python 3.6 or later installed on yo
 1. Open the terminal and clone the repository:
 
 ```bash
-git clone https://github.com/quentinbacquele/CLUSTERS-VIZ
+git clone https://github.com/quentinbacquele/CLUSTERS-VIZ.git
 ```
 
 2. Navigate to the cloned directory:
