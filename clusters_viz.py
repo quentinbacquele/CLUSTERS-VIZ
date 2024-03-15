@@ -3,8 +3,7 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
-import re
-import numpy as np
+import webbrowser
 
 
 
@@ -435,4 +434,5 @@ def display_hover(hoverData, selected_dataset, selected_bird, selected_morph, se
 
 
 if __name__ == "__main__":
+    webbrowser.open_new("http://127.0.0.1:8050/")
     app.run_server(debug=True)
