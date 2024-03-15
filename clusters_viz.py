@@ -332,7 +332,9 @@ def update_graph(selected_dataset, selected_bird, selected_morph, selected_popul
             z=group['Dim3'],
             mode='markers',
             marker=dict(size=5, opacity=1, line=dict(color='black', width=2), color=group['color']),
-            name=str(label)  # Set the legend name to the label of the group
+            name=str(label),  # Set the legend name to the label of the group
+            customdata=group['file_name'],  # Include file_name as custom data
+            hovertemplate="<extra></extra>",  # Optional: Customize hover template if needed
         ))
 
     # Add unselected points
@@ -376,6 +378,8 @@ def update_graph(selected_dataset, selected_bird, selected_morph, selected_popul
 def display_hover(hoverData, selected_dataset, selected_bird, selected_morph, selected_population, pathname):
     if hoverData is None:
         return False, no_update, no_update
+    
+    
 
     # Extract the page_id from the pathname
     page_id = 'p1'  
@@ -400,17 +404,14 @@ def display_hover(hoverData, selected_dataset, selected_bird, selected_morph, se
         df['is_selected'] &= (df['morph'] == selected_morph)
     if selected_population != 'all':
         df['is_selected'] &= (df['pop_code'] == selected_population)
-    
-  
-    selected_count = df[df['is_selected']].shape[0]
+ 
+
+    pt = hoverData["points"][0]
+    file_name_hovered = pt["customdata"]
     pt = hoverData["points"][0]
     bbox = pt["bbox"]
-    point_index = pt["pointNumber"]
 
-    if point_index >= selected_count:
-        return False, no_update, no_update
-
-    df_row = df[df['is_selected']].iloc[point_index]
+    df_row = df[df['file_name'] == file_name_hovered].iloc[0]
 
     # Check if the hovered point is selected
     if not df_row['is_selected']:
